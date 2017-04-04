@@ -1,21 +1,39 @@
 #ifndef LIB
 #define LIB
+#include <stdint.h>
+
+#define S 10
+#define F 20
+#define D 30
+#define Z 40
+#define B 50
+#define Y 60
+#define N 70
+
+#define PAYLOAD_LEN 1400
+#define MAXL 250
+
+#define show_packet(p) printf("[%s] %x %x %x %x %hu\n",__FILE__, p.soh, p.len, p.seq, p.type, p.check);
+
+#define print_crc(p) printf("[%s] %u\n",__FILE__, p.check);
+
+#define print_data(m) printf("[%s] %s\n", __FILE__, m.payload)
 
 typedef struct {
 	uint8_t soh;
 	uint8_t len;
 	uint8_t seq;
 	uint8_t type;
-	char *data;
-	uint8_t check;
+	char 	data[MAXL];
+	uint16_t check;
 	uint8_t mark;
-}
+} packet;
 
 typedef struct {
 	uint8_t maxl;
 	uint8_t time;
 	uint8_t npad;
-	uint8_t padc;
+	uint8_t padc; //if npad is 0x00 this is ignored
 	uint8_t eol;
 	uint8_t qctl;
 	uint8_t qbin;
@@ -27,7 +45,7 @@ typedef struct {
 
 typedef struct {
     int len;
-    char payload[1400];
+    char payload[PAYLOAD_LEN];
 } msg;
 
 void init(char* remote, int remote_port);

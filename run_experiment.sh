@@ -7,8 +7,8 @@ CORRUPT=20
 FILES=(file1.txt file2.txt)
 
 killall link
-killall recv
-killall send
+killall kesender
+killall kreceiver
 
 ./link_emulator/link speed=$SPEED delay=$DELAY loss=$LOSS corrupt=$CORRUPT &> /dev/null &
 sleep 1
