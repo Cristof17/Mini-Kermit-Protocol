@@ -19,6 +19,15 @@
 
 #define print_data(m) printf("[%s] %s\n", __FILE__, m.payload)
 
+#define print_stats(s) printf("[%s] %d %d %d %c %c\n", __FILE__, s.maxl, s.time,s.npad, s.padc, s.eol);
+
+#define SOH 0x01
+#define MAXL 250
+#define TIME 5 //seconds
+#define NPAD 0x00
+#define PADC 0x00
+#define EOL 0x0D
+
 typedef struct {
 	uint8_t soh;
 	uint8_t len;

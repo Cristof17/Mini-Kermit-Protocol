@@ -8,6 +8,36 @@
 #define HOST "127.0.0.1"
 #define PORT 10001
 
+//seq is a variable declared inside main, and thus it is passed as a parameter
+void create_nack(msg *t, int seq){
+	packet p;
+	memset(&p, 0, sizeof(p));
+	p.soh = SOH;
+	p.len = 5; //all the headers after len(the data field is null)
+	p.seq = seq;
+	p.type = N;
+	p.check = crc16_ccitt(&p, p.len);
+	
+	t->len = 1 + 1 + 1 + 1 + 2 + 1;
+	//t.len = SOH + LEN + SEQ + TYPE + CHECK + MARK
+	memcpy(t->payload, &p, 7);
+}
+
+//seq is a variable defined inside main, an needs to be passed as parameter
+void create_ack(msg *t, int seq){
+	packet p;
+	memset(&p, 0, sizeof(p));
+	p.soh = SOH;
+	p.len = 5; //all the headers after len(the data field is null)
+	p.seq = seq;
+	p.type = Y;
+	p.check = crc16_ccitt(&p, p.len);
+	
+	t->len = 1 + 1 + 1 + 1 + 2 + 1;
+	//t.len = SOH + LEN + SEQ + TYPE + CHECK + MARK
+	memcpy(t->payload, &p, 7);
+}
+
 int main(int argc, char** argv) {
     msg r, t;
 	int rc = 0;
@@ -40,11 +70,30 @@ int main(int argc, char** argv) {
 	memset(&p, 0, sizeof(p));
 	memset(&s, 0, sizeof(s));
 	memcpy(&p, r.payload, r.len);
+	memcpy(&s, p.data, p.len - 1 -1 -2 -1);
 	show_packet(p);
 	//check params CRC
 	crc = crc16_ccitt(&p, sizeof(p) - 3); 
 	print_crc(p);
+	if (crc != p.check){
+		//TODO resend status packet
+		//create nack and send it
+		memset(&t, 0, sizeof(t));
+		create_nack(&t, seq);
+		send_message(&t);
+	} else { 
+		//create ack and send it
+		memset(&t, 0, sizeof(t));
+		create_ack(&t, seq);
+		send_message(&t);
+	}
 	//TODO Parse parameters
+	int maxl = s.maxl;
+	int time = s.time;
+	int npad = s.npad;
+	char padc = s.padc;
+	char eol = s.eol;
+	print_stats(s);
 
 	//TODO While (!received EOT)
 

@@ -45,11 +45,11 @@ int main(int argc, char** argv) {
 	packet p;
 	memset(&s, 0, sizeof(s_packet));
 	memset(&p, 0, sizeof(packet));
-	uint8_t maxl = 250;
-	uint8_t time = 5;
-	uint8_t npad = 0x00;
-	uint8_t padc = 0x00;
-	uint8_t eol = 0x0D;
+	uint8_t maxl = MAXL;
+	uint8_t time = TIME;
+	uint8_t npad = NPAD;
+	uint8_t padc = PADC;
+	uint8_t eol = EOL;
 	memcpy(&s.maxl, &maxl, sizeof(maxl));
 	memcpy(&s.time, &time, sizeof(time));
 	memcpy(&s.npad, &npad, sizeof(npad));
@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 	memset(&s.capa, 0, sizeof(s.capa));
 	memset(&t, 0, sizeof(msg));
 	memset(&p, 0, sizeof(packet));
-	uint8_t soh = 0x01;
+	uint8_t soh = SOH;
 	uint8_t len = 1 + 1 + 11 + 2 + 1;
 	//len - 1 means the length of the message minus MARK
 	p.soh = soh;
@@ -84,6 +84,19 @@ int main(int argc, char** argv) {
 	
 	show_packet(p);
 	print_crc(p);
+	//conver to milies
+    y = receive_message_timeout(TIME * 1000);
+
+	//wait for ack for parameter packet
+	memset(y, 0, sizeof(msg));
+    if (y == NULL) {
+        perror("receive error");
+		//here is a problem
+    } else {
+		memset(&p, 0, sizeof(packet));
+		memcpy(&p, y->payload, y->len);
+        printf("[%s] Got  %s of type %d\n", argv[0], y->payload, p.type);
+    }
 
 	//TODO Send init
 	for (i = 1; i < argc-1; ++i){
