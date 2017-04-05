@@ -38,13 +38,25 @@ void create_ack(msg *t, int seq){
 	memcpy(t->payload, &p, 7);
 }
 
+int is_crc_ok(packet p){
+	unsigned short packet_crc = p.check;
+	unsigned short calculated_crc = crc16_ccitt(&p, sizeof(p) - 3);
+	if (packet_crc == calculated_crc){
+		return OK;
+	}
+	return NOT_OK;
+}
+
 int main(int argc, char** argv) {
     msg r, t;
 	int rc = 0;
-	int seq = 0;
+	int seq_asteptat = 0;
+	int seq_trimis = 0;
 	uint16_t crc;
 	packet p;
 	s_packet s;
+	FILE *file;
+	msg *y;
 
     init(HOST, PORT);
 
@@ -59,41 +71,49 @@ int main(int argc, char** argv) {
     t.len = strlen(t.payload);
     send_message(&t);
 	
-	//TODO Save last received packet and index awaited
-
-	//TODO Save current_open file
-
 	//TODO Receive parameters
 	memset(&r, 0, sizeof(msg));
+	//TODO Not ok. The parameters might get lost that is why there is seg fault 
 	rc = recv_message(&r);
 	DIE(rc < 0, "error when receiving S packet");
+
+	//extract parameters
 	memset(&p, 0, sizeof(p));
 	memset(&s, 0, sizeof(s));
 	memcpy(&p, r.payload, r.len);
 	memcpy(&s, p.data, p.len - 1 -1 -2 -1);
+	//TODO Debug purpose
 	show_packet(p);
 	//check params CRC
 	crc = crc16_ccitt(&p, sizeof(p) - 3); 
 	print_crc(p);
+	seq_trimis = p.seq;
 	if (crc != p.check){
 		//TODO resend status packet
 		//create nack and send it
 		memset(&t, 0, sizeof(t));
-		create_nack(&t, seq);
-		send_message(&t);
+		create_nack(&t, seq_trimis);
 	} else { 
 		//create ack and send it
 		memset(&t, 0, sizeof(t));
-		create_ack(&t, seq);
-		send_message(&t);
+		create_ack(&t, ++seq_trimis);
 	}
-	//TODO Parse parameters
-	int maxl = s.maxl;
-	int time = s.time;
-	int npad = s.npad;
-	char padc = s.padc;
-	char eol = s.eol;
-	print_stats(s);
+	print_message(t);
+	send_message(&t);
+
+	//TODO Receive the first message
+	while(p.type != B){
+		y = receive_message_timeout(TIME * 1000);
+		if (y == NULL){
+			fprintf(stderr, "TIMEOUT for seq %d\n", seq_asteptat);
+			//send the last message
+			send_message(&t);
+		} else {
+			//process message	
+			print_message((*y));
+			seq_asteptat++;
+		}
+	}
 
 	//TODO While (!received EOT)
 

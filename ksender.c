@@ -16,8 +16,10 @@ int main(int argc, char** argv) {
 	msg *curr;
 	int i = 0; //file index
 	int rc = 0; //return code
-	int seq = 0; //current_packet_index
+	int seq_asteptat = 0 ; //current_packet_index
+	int seq_trimis = 0;
 	uint16_t crc = 0;
+	int retransmitted =0;
 	//TODO Save current packet and current index
 
     init(HOST, PORT);
@@ -67,7 +69,7 @@ int main(int argc, char** argv) {
 	//len - 1 means the length of the message minus MARK
 	p.soh = soh;
 	p.len = len;
-	p.seq = seq;
+	p.seq = seq_trimis;
 	p.type = S;
 	crc= crc16_ccitt(&p, p.len - 3);
 	p.check = crc;
@@ -81,29 +83,96 @@ int main(int argc, char** argv) {
 	//Send s
 	rc = send_message(&t);
 	DIE(rc < 0, "Cannot send message S");
+	seq_trimis++;
 	
 	show_packet(p);
 	print_crc(p);
-	//conver to milies
-    y = receive_message_timeout(TIME * 1000);
 
 	//wait for ack for parameter packet
 	memset(y, 0, sizeof(msg));
+	//conver to milies
+    y = receive_message_timeout(TIME * 1000);
     if (y == NULL) {
         perror("receive error");
 		//here is a problem
-    } else {
+		//resend last packet;
+		rc = send_message(&t);
+		DIE(rc < 0, "Cannot resend send message S");
+		retransmitted++;
+		//while has to receive packets
+		while (((y = receive_message_timeout(TIME * 1000)) == NULL)
+				&& retransmitted < 3){
+				rc = send_message(&t);
+				DIE(rc < 0, "Cannot resend send message S");
+				retransmitted++;
+		}
+		if (retransmitted == 4){
+			//TODO Stop transmission
+			//stop connection
+		} else{
+			seq_asteptat++;
+		}
+    } else { 
 		memset(&p, 0, sizeof(packet));
 		memcpy(&p, y->payload, y->len);
+		if (p.type == N){
+			//resend last packet with seq increased
+			memset(&t, 0, sizeof(msg));
+			p.seq = seq_trimis;
+			rc = send_message(&t);
+			DIE(rc < 0, "Cannot send NACK");
+		}else {
+			//increase seq
+			seq_asteptat++;
+		}
         printf("[%s] Got  %s of type %d\n", argv[0], y->payload, p.type);
     }
 
 	//TODO Send init
 	for (i = 1; i < argc-1; ++i){
 		char *filename = argv[i];
-		FILE * f = fopen(filename, "r+");
+		char *strip = NULL;
+		FILE *f = fopen(filename, "r+");
 		DIE(f == NULL, "Filename is null ");
+		int filename_len = strlen(filename);
 
+		//create F packet
+		memset(&p, 0, sizeof(packet));
+		memset(&t, 0, sizeof(msg));
+		p.soh = SOH;
+		p.len = 1 + 1 + filename_len + 2 + 1;
+		p.seq = seq_trimis;
+		p.type = F;
+		strcpy(p.data, filename);
+		crc = crc16_ccitt(&p, 4 + filename_len);
+		p.check = crc;
+		show_packet(p);
+		
+		//put it into a message
+		
+		//SOH + LEN + SEQ + TYPE +_DATA + CHECK + MARK
+		t.len = (4 + filename_len + 3) + 1;
+		//plus the \0 of the string
+		memcpy(t.payload, &p, sizeof(p));
+		rc = send_message(&t);
+		print_message(t);
+		DIE (rc < 0, "Cannot send message with filename");
+		y = receive_message_timeout(TIME * 1000);
+		if (y == NULL){
+			//resend the next packet
+			rc = send_message(&t);
+			DIE (rc < 0, "Cannot resend lost data packet");
+		} else {
+			memset(&p, 0, sizeof(p));
+			memcpy(&p, y->payload, sizeof(p));
+			show_packet(p);
+			if (p.type == Y){
+				seq_asteptat++;
+			} else {
+				rc = send_message(&t);
+				DIE(rc < 0, "Cannot resend corrupted file");
+			}
+		}
 		fclose(f);
 	}
 
