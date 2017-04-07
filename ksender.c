@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
 	char buffer[MAXL];
 	int numBytes;
 	FILE *f;
+	int type = 0;
 	//TODO Save current packet and current index
 
     init(HOST, PORT);
@@ -94,12 +95,8 @@ int main(int argc, char** argv) {
 	memcpy(&p, y->payload, sizeof(p));
 	if (p.type == N){
 		memset(&p, 0, sizeof(p));
-		memcpy(&p.data, &s, sizeof(s));
-		p.soh = soh;
-		p.type = S;
-		p.len = 1 + 1 + 11 + 2 + 1;
+		memcpy(&p, &t.payload, sizeof(p));
 		p.seq = seq;
-		p.mark = MARK;
 		crc = crc16_ccitt(&p, sizeof(packet) - 4);
 		printf("CRC pentru S în sender este %d\n", crc);
 		p.check = crc;
@@ -111,17 +108,18 @@ int main(int argc, char** argv) {
 		retransmitted = 0;
 		goto WAIT_ACK_S;
 	}
-
-
-	/*
-	memset(&p, 0, sizeof(packet));
+	
+	//send B message
+	memset(&p, 0, sizeof(p));
 	memset(&t, 0, sizeof(msg));
 	len = sizeof(p) - 2;
 	p.soh = soh;
 	p.len = len;
 	p.seq = seq;
 	p.type = B;
-	//len - 3 means the length of the message minus MARK + CHECK
+	printf("[%s]: Sending type %d\n", __FILE__, p.type);
+	show_packet(p);
+	//len - 4 means the length of the message minus MARK + CHECK + PADDING
 	crc= crc16_ccitt(&p, sizeof(p) - 4);
 	p.check = crc;
 	//the size of the status fields is the len + the first two fields
@@ -131,16 +129,14 @@ int main(int argc, char** argv) {
 	//Send s
 	rc = send_message(&t);
 	DIE(rc < 0, "Cannot send message S");
-	show_packet(p);
-	print_crc(p);
 
-	WAIT_ACK_B:
+	WAIT_ACK_ANY:
 	//while has to receive packets
 	while ((y = receive_message_timeout(TIME * 1000)) == NULL){
 		if (retransmitted == 3){
 			//TODO Stop transmission
 			//stop connection
-			//goto release;
+			goto RELEASE;
 		}else{
 			rc = send_message(&t);
 			DIE(rc < 0, "Cannot resend send message S");
@@ -153,13 +149,9 @@ int main(int argc, char** argv) {
 	memcpy(&p, y->payload, sizeof(p));
 	if (p.type == N){
 		memset(&p, 0, sizeof(p));
-		memcpy(&p.data, &s, sizeof(s));
-		p.soh = soh;
-		p.type = S;
-		p.len = len;
+		memcpy(&p, &t.payload, sizeof(p));
 		p.seq = seq;
-		p.mark = MARK;
-		crc = crc16_ccitt(&p, sizeof(p) -3);
+		crc = crc16_ccitt(&p, sizeof(p) -4);
 		p.check = crc;
 		memset(&t, 0, sizeof(t));
 		memcpy(&t.payload, &p, sizeof(p));
@@ -167,10 +159,9 @@ int main(int argc, char** argv) {
 		rc = send_message(&t);
 		DIE(rc < 0, "Cannot send S packet again");
 		retransmitted = 0;
-		goto WAIT_ACK_B;
+		goto WAIT_ACK_ANY;
 	}
 	show_packet(p);
-	*/
 	RELEASE:
     return 0;
 }

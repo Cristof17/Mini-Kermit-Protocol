@@ -16,7 +16,7 @@
 #define OK 		1
 #define NOT_OK 	0
 
-#define show_packet(p) printf("[%s] %x %x %x %x %hu %s\n",__FILE__, p.soh, p.len, p.seq, p.type, p.check, p.data);
+#define show_packet(p) printf("[%s] %x %x %x %d %hu %s\n",__FILE__, p.soh, p.len, p.seq, p.type, p.check, p.data);
 
 #define print_crc(p) printf("[%s] %u\n",__FILE__, p.check);
 

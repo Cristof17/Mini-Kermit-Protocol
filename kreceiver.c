@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
 	int crc_calculat = 0;
 	int crc_primit = 0;
 	int flag = 0;
+	int type = 0;
 
     init(HOST, PORT);
 	
@@ -80,9 +81,10 @@ int main(int argc, char** argv) {
 		} else {
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, y->payload, sizeof(p));
+			show_packet(p);
 			crc_calculat = crc16_ccitt(&p, sizeof(packet)-4);
-			printf("CRC pentru S în receiver 2 este %d\n", crc_calculat); 
 			crc_primit = p.check;
+			printf("[%s]: CRC calculat = %d, CRC primit = %d\n", __FILE__, crc_calculat, crc_primit);
 			memset(&r, 0, sizeof(r));
 			memcpy(&r, y, sizeof(r));
 			memset(&t, 0, sizeof(msg));
@@ -96,6 +98,7 @@ int main(int argc, char** argv) {
 				p.type = N;
 				printf("Am primit cu erori 2\n");
 			} else {
+				type = p.type; //save the received type and reuse packet struct
 				p.type = Y;
 				printf("Am primit fara erori 2\n");
 			}
@@ -111,7 +114,7 @@ int main(int argc, char** argv) {
 			}
 			//luare actiune pentru fiecare tip de mesaj
 			show_packet(p);	
-			switch(p.type){
+			switch(type){
 				case S:{
 					break;
 				}
@@ -125,6 +128,7 @@ int main(int argc, char** argv) {
 					break;
 				}
 				case B:{
+					printf("[%s]: Am primit B\n", __FILE__);
 					flag = 10;
 					break;
 				}

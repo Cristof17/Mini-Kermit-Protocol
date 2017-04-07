@@ -3,7 +3,7 @@
 SPEED=10
 DELAY=10
 LOSS=5
-CORRUPT=20
+CORRUPT=0
 FILES=(file1.txt file2.txt)
 
 killall link
