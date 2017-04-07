@@ -4,7 +4,7 @@ SPEED=10
 DELAY=10
 LOSS=5
 CORRUPT=0
-FILES=(file1.txt file2.txt)
+FILES=(file1.txt)
 
 killall link
 killall kesender

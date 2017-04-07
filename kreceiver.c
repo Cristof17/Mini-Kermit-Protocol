@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
 				case D:{
 					printf("[%s]: Am primit un mesaj de tip D\n", __FILE__);
 					if (f != NULL){
-						fwrite(p.data, MAXL, 1, f);
+						fwrite(p.data, p.len, 1, f);
 					} else {
 						printf("[%s]: File is null\n");
 						goto RELEASE;
