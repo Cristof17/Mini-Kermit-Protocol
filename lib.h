@@ -16,18 +16,6 @@
 #define OK 		1
 #define NOT_OK 	0
 
-#define show_packet(p) printf("[%s] %x %x %x %d %hu %s\n",__FILE__, p.soh, p.len, p.seq, p.type, p.check, p.data);
-
-#define print_crc(p) printf("[%s] %u\n",__FILE__, p.check);
-
-#define print_data(m) printf("[%s] %s\n", __FILE__, m.payload)
-
-#define print_message(m) printf("[%s] %d %s\n", __FILE__, m.len, m.payload);
-
-#define print_stats(s) printf("[%s] %d %d %d %c %c\n", __FILE__, s.maxl, s.time,s.npad, s.padc, s.eol);
-
-#define print_status(i) printf("[%s] Aștept cu i = %d\n", __FILE__, i);
-
 #define SOH		0x01
 #define MAXL	250
 #define TIME 	5 //seconds
