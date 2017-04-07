@@ -27,7 +27,6 @@ int main(int argc, char** argv) {
 
     init(HOST, PORT);
 	
-	//TODO Not ok. The parameters might get lost that is why there is seg fault 
 	while ((y = receive_message_timeout(TIME * 1000)) == NULL
 		&& retransmitted < 4){
 		retransmitted++;
@@ -51,7 +50,7 @@ int main(int argc, char** argv) {
 		ack_p.soh = SOH;
 		ack_p.len = 0;
 		ack_p.mark = MARK;
-		seq = ack_p.seq;
+		seq = p.seq;
 		seq++;
 		ack_p.seq = seq;
 		if (crc_calculat != crc_primit){
@@ -68,14 +67,12 @@ int main(int argc, char** argv) {
 		retransmitted = 0;
 	}
 
-	//process S packet
-
 	while(1){
 		while ((y = receive_message_timeout(TIME * 1000)) == NULL
 			&& retransmitted < 4){
 			retransmitted++;
 			send_message(&t);
-			printf("[%s]: Tot trimit cu retransmit = %d type = %d\n", __FILE__, retransmitted, type);
+			print_status(retransmitted);
 		}
 		if (retransmitted == 4){
 			//stop connection
@@ -83,10 +80,11 @@ int main(int argc, char** argv) {
 		} else {
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, y->payload, sizeof(p));
-			show_packet(p);
+			printf("[%s]: Am primit %d\n",__FILE__, p.seq);
+			//show_packet(p);
 			crc_calculat = crc16_ccitt(&p, sizeof(packet)-4);
 			crc_primit = p.check;
-			printf("[%s]: CRC calculat = %d, CRC primit = %d\n", __FILE__, crc_calculat, crc_primit);
+			printf("[%s]: CRC calculat = %d, CRC primit = %d pentru %d\n", __FILE__, crc_calculat, crc_primit, p.seq);
 			memset(&r, 0, sizeof(r));
 			memcpy(&r, y, sizeof(r));
 			memset(&t, 0, sizeof(msg));
@@ -94,16 +92,15 @@ int main(int argc, char** argv) {
 			ack_p.soh = SOH;
 			ack_p.len = 0;
 			ack_p.mark = MARK;
-			seq = ack_p.seq;
+			seq = p.seq;
 			seq++;
 			ack_p.seq = seq;
 			if (crc_calculat != crc_primit){
 				ack_p.type = N;
-				printf("Am primit cu erori 2\n");
 			} else {
 				type = p.type; //save the received type and reuse packet struct
 				ack_p.type = Y;
-				printf("Am primit fara erori 2\n");
+				printf("[%s]: Am primit fara erori 2 %d\n", __FILE__,p.seq);
 			}
 			memcpy(&t.payload, &ack_p, sizeof(p));
 			t.len = sizeof(p);
@@ -112,13 +109,13 @@ int main(int argc, char** argv) {
 			retransmitted = 0;
 			
 			if (crc_calculat != crc_primit){
-				printf("Tot gresit\n");
 				continue;
 			}
 			//luare actiune pentru fiecare tip de mesaj
 			//show_packet(p);	
 			switch(type){
 				case S:{
+					printf("[%s]: Am primit un mesaj de tip S\n", __FILE__);
 					break;
 				}
 				case F:{
@@ -167,26 +164,9 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	//TODO While (!received EOT)
-
-	//TODO parse each message parameters
-
-	//TODO receive(file_heoaders)
-
-	//TODO create_files_on_disk
-
-	//TODO receive(file_data)
-
-	//TODO calculate_crc()
-
-	//TODO Send ACK/NACK
-
-	//TODO Write_in_file
-
-	//TODO Close file
 	RELEASE:
 		if (f != NULL){
-		printf("[%s]: Ajung aici \n", __FILE__);
+			printf("[%s]: Ajung aici \n", __FILE__);
 			fflush(f);
 			fclose(f);
 		}

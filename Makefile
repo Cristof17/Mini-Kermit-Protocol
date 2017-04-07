@@ -13,5 +13,3 @@ kreceiver: kreceiver.o link_emulator/lib.o
 
 clean:
 	-rm -f *.o ksender kreceiver 
-stop:
-	kill -9 $(pidof kreceiver)

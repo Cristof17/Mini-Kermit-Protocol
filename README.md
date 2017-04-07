@@ -1,1 +1,0 @@
-# Mini-Kermit-Protocol
