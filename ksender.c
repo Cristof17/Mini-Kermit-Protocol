@@ -22,24 +22,10 @@ int main(int argc, char** argv) {
 	msg *y;
 	char buffer[MAXL];
 	int numBytes;
-	for (i =0 ;i < argc; ++i){
-		printf("Arg %d is %s\n", i, argv[i]);
-	}
+	FILE *f;
 	//TODO Save current packet and current index
 
     init(HOST, PORT);
-
-    sprintf(t.payload, "Hello World of PC");
-    t.len = strlen(t.payload);
-    send_message(&t);
-
-    y= receive_message_timeout(5000);
-    if (y == NULL) {
-        perror("receive error");
-		//Resend
-    } else {
-        printf("[%s] Got reply with payload: %s\n", argv[0], y->payload);
-    }
 
 	//TODO read arguments
     if (argc < 2){
@@ -95,7 +81,7 @@ int main(int argc, char** argv) {
 		if (retransmitted == 3){
 			//TODO Stop transmission
 			//stop connection
-			//goto release;
+			goto RELEASE;
 		}else{
 			rc = send_message(&t);
 			DIE(rc < 0, "Cannot resend send message S");
@@ -125,8 +111,6 @@ int main(int argc, char** argv) {
 		retransmitted = 0;
 		goto WAIT_ACK_S;
 	}
-	show_packet(p);
-	printf("Trec de primul while\n");
 
 
 	/*
@@ -187,6 +171,6 @@ int main(int argc, char** argv) {
 	}
 	show_packet(p);
 	*/
-
+	RELEASE:
     return 0;
 }
