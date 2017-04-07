@@ -1,1 +1,27 @@
 # Mini-Kermit-Protocol
+# Rotsching Cristofor 343C1
+
+Implementarea senderului este în felul următor:
+	Senderul funcționează pe baza de etichet la care se sare folosind goto;
+	Trimit prima oară un pachet de tip S, apoi într-un for iterez prin fisiere
+	primite ca argument.
+		Pentru fiecare fisier care este procesat, în bucla for am folosit 
+	ethichete la care se sare în cazul în care un pachet nu a fost recepționat
+	corect.
+		Pentru verificarea transmiterii tuturor mesajelor am folosit ACK/NACK
+	si numere de secvență (seq_trimis, seq_asteptat). Seq_trimis este incrementat
+	cu 2 după ce se trimite un mesaj și reprezintă valoarea pe care următorul 
+	pachet o va folosi pentru numărul de secvență al său; seq_asteptat reprezintă
+	numărul de secvență folosit de către receptor (Conform graficului din enunțul
+	temei, seq_trimis = seq_asteptat - 1(nr. de secvență folosit în următorul mesaj)
+	Entitățile au o structură pachet pe care o folosește pentru a decapsula
+	informațiile conținute în msg.
+
+Implementarea receiverului
+	Pentru receiver am implementat primirea mesajelor într-o buclă while(1)
+	din care se ies în momentul în care s-a detectat mesaj de tip B (EOT);
+	Acesta calculează CRC-uri și dacă se potrivesc trimite un mesaj de tip NACK
+	altfel trimite un mesaj de tip ACK și procesează pachetul într-o structură 
+	switch-case. Numerele de secvență pentru pachetele trimise de receptor(ACK/NACK)
+	sunt cu 1 mai mari decât cele primite de la emitor.
+
