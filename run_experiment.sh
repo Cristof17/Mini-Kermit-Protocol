@@ -2,8 +2,8 @@
 
 SPEED=10
 DELAY=10
-LOSS=5
-CORRUPT=0
+LOSS=50
+CORRUPT=50
 FILES=(file1.txt)
 
 killall link

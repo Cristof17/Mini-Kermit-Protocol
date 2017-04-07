@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include "lib.h"
 #include "helpers.h"
+#include <errno.h>
 #define HOST "127.0.0.1"
 #define PORT 10001
 
@@ -14,6 +15,7 @@ int main(int argc, char** argv) {
 	int seq = 0;
 	uint16_t crc;
 	packet p;
+	packet ack_p;
 	s_packet s;
 	FILE *f = NULL;
 	msg *y;
@@ -37,29 +39,30 @@ int main(int argc, char** argv) {
 	} else {
 		memset(&p, 0, sizeof(p));
 		memcpy(&p, y->payload, sizeof(p));
-		show_packet(p);
+		//show_packet(p);
+		memset(&ack_p, 0, sizeof(ack_p));
 		crc_calculat = crc16_ccitt(&p, sizeof(packet)- 4);
 		crc_primit = p.check;
 		printf("CRC calculat = %d, primit = %d\n", crc_calculat, crc_primit);
 		memset(&r, 0, sizeof(r));
 		memcpy(&r, y, sizeof(r));
 		memset(&t, 0, sizeof(msg));
-		memset(&p, 0, sizeof(packet));
-		p.soh = SOH;
-		p.len = 0;
-		p.mark = MARK;
-		seq = p.seq;
+		memset(&ack_p, 0, sizeof(packet));
+		ack_p.soh = SOH;
+		ack_p.len = 0;
+		ack_p.mark = MARK;
+		seq = ack_p.seq;
 		seq++;
-		p.seq = seq;
+		ack_p.seq = seq;
 		if (crc_calculat != crc_primit){
-			p.type = N;
+			ack_p.type = N;
 			printf("Am primit S cu erori\n");
 		} else {
-			p.type = Y;
+			ack_p.type = Y;
 			printf("Am primit S fără erori\n");
 		}
-		memcpy(&t.payload, &p, sizeof(p));
-		t.len = sizeof(p);
+		memcpy(&t.payload, &ack_p, sizeof(p));
+		t.len = sizeof(ack_p);
 		rc = send_message(&t);
 		DIE (rc < 0, "Cannot send ACK for parameter packet");
 		retransmitted = 0;
@@ -72,7 +75,7 @@ int main(int argc, char** argv) {
 			&& retransmitted < 4){
 			retransmitted++;
 			send_message(&t);
-			printf("[%s]: Tot trimit cu retransmit = %d\n", __FILE__, retransmitted);
+			printf("[%s]: Tot trimit cu retransmit = %d type = %d\n", __FILE__, retransmitted, type);
 		}
 		if (retransmitted == 4){
 			//stop connection
@@ -87,21 +90,22 @@ int main(int argc, char** argv) {
 			memset(&r, 0, sizeof(r));
 			memcpy(&r, y, sizeof(r));
 			memset(&t, 0, sizeof(msg));
-			p.soh = SOH;
-			p.len = 0;
-			p.mark = MARK;
-			seq = p.seq;
+			memset(&ack_p, 0, sizeof(ack_p));
+			ack_p.soh = SOH;
+			ack_p.len = 0;
+			ack_p.mark = MARK;
+			seq = ack_p.seq;
 			seq++;
-			p.seq = seq;
+			ack_p.seq = seq;
 			if (crc_calculat != crc_primit){
-				p.type = N;
+				ack_p.type = N;
 				printf("Am primit cu erori 2\n");
 			} else {
 				type = p.type; //save the received type and reuse packet struct
-				p.type = Y;
+				ack_p.type = Y;
 				printf("Am primit fara erori 2\n");
 			}
-			memcpy(&t.payload, &p, sizeof(p));
+			memcpy(&t.payload, &ack_p, sizeof(p));
 			t.len = sizeof(p);
 			rc = send_message(&t);
 			DIE (rc < 0, "Cannot send ACK for parameter packet");
@@ -112,7 +116,7 @@ int main(int argc, char** argv) {
 				continue;
 			}
 			//luare actiune pentru fiecare tip de mesaj
-			show_packet(p);	
+			//show_packet(p);	
 			switch(type){
 				case S:{
 					break;
@@ -124,14 +128,18 @@ int main(int argc, char** argv) {
 						memset(filename, 0, MAXL);
 						sprintf(filename, "recv_");
 						strcat(filename, p.data);
-						f = fopen(filename, "a+");
+						f = fopen(filename, "wa+");
 					}
 					break;
 				}
 				case D:{
 					printf("[%s]: Am primit un mesaj de tip D\n", __FILE__);
+					printf("[%s]: Dimensiunea fisierului = %d\n", __FILE__, p.len);
 					if (f != NULL){
-						fwrite(p.data, p.len, 1, f);
+						int bytesWritten = fwrite(p.data, 1, p.len, f);
+						printf("[%s]: Fwrite errno = %d\n", __FILE__, errno);
+						fflush(f);
+						printf("[%s]: Am scris în fisier %d\n", __FILE__, bytesWritten);
 					} else {
 						printf("[%s]: File is null\n");
 						goto RELEASE;
@@ -178,8 +186,10 @@ int main(int argc, char** argv) {
 	//TODO Close file
 	RELEASE:
 		if (f != NULL){
+		printf("[%s]: Ajung aici \n", __FILE__);
 			fflush(f);
 			fclose(f);
 		}
+		printf("[%s]: Ajung aici \n", __FILE__);
 	return 0;
 }

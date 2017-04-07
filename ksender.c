@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
 	//len - 3 means the length of the message minus MARK + CHECK
 	crc= crc16_ccitt(&p, sizeof(packet)-4);
 	p.check = crc;
-	show_packet(p);
+	//show_packet(p);
 	//the size of the status fields is the len + the first two fields
 	memcpy(&t.payload, &p, sizeof(p));
 	//SOH + LEN + Len
@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	seq++;
+	retransmitted = 0;
 	memset(&p, 0, sizeof(p));
 	memcpy(&p, y->payload, sizeof(p));
 	if (p.type == N){
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
 		sprintf(p.data, "%s", argv[i]);
 		f = fopen(argv[i], "r+");
 		printf("[%s]: Sending type %d\n", __FILE__, p.type);
-		show_packet(p);
+		//show_packet(p);
 		//len - 4 means the length of the message minus MARK + CHECK + PADDING
 		crc= crc16_ccitt(&p, sizeof(p) - 4);
 		p.check = crc;
@@ -148,9 +149,11 @@ int main(int argc, char** argv) {
 			}
 		}
 		seq++;
+		retransmitted = 0;
 		memset(&p, 0, sizeof(p));
 		memcpy(&p, y->payload, sizeof(p));
 		if (p.type == N){
+			printf("[%s]: Am primit NACK pentru F cu seq %d\n", __FILE__, seq);
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, &t.payload, sizeof(p));
 			p.seq = seq;
@@ -164,7 +167,7 @@ int main(int argc, char** argv) {
 			retransmitted = 0;
 			goto WAIT_ACK_F;
 		}
-		show_packet(p);
+		//show_packet(p);
 
 		READ_DATA:
 		//send D message
@@ -174,14 +177,14 @@ int main(int argc, char** argv) {
 		p.soh = soh;
 		p.seq = seq;
 		p.type = D;
-		numBytes = fread(p.data, MAXL, 1, f);
+		numBytes = fread(p.data, 1, MAXL, f);
 		printf("[%s] Am citit %d\n", __FILE__, numBytes);
 		p.len = numBytes;
 		printf("[%s]: Sending type %d\n", __FILE__, p.type);
-		show_packet(p);
 		//len - 4 means the length of the message minus MARK + CHECK + PADDING
 		crc= crc16_ccitt(&p, sizeof(p) - 4);
 		p.check = crc;
+		show_packet(p);
 		//the size of the status fields is the len + the first two fields
 		memcpy(&t.payload, &p, sizeof(p));
 		//SOH + LEN + Len
@@ -205,15 +208,17 @@ int main(int argc, char** argv) {
 			}
 		}
 		seq++;
+		retransmitted = 0;
 		memset(&p, 0, sizeof(p));
 		memcpy(&p, y->payload, sizeof(p));
 		if (p.type == N){
+			printf("[%s]: Am primit NACK pentru D cu seq %d\n", __FILE__, seq);
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, &t.payload, sizeof(p));
 			p.seq = seq;
 			crc = crc16_ccitt(&p, sizeof(p) -4);
 			p.check = crc;
-			memset(&t, 0, sizeof(t));
+		//	memset(&t, 0, sizeof(t));
 			memcpy(&t.payload, &p, sizeof(p));
 			t.len = sizeof(p);
 			rc = send_message(&t);
@@ -224,7 +229,7 @@ int main(int argc, char** argv) {
 		if (numBytes != 0){
 			goto READ_DATA;
 		}
-		show_packet(p);
+		//show_packet(p);
 
 		//send EOF message
 		memset(&p, 0, sizeof(p));
@@ -238,7 +243,7 @@ int main(int argc, char** argv) {
 		if (numBytes == 0)
 			p.type = Z;
 		printf("[%s]: Sending type %d\n", __FILE__, p.type);
-		show_packet(p);
+		//show_packet(p);
 		//len - 4 means the length of the message minus MARK + CHECK + PADDING
 		crc= crc16_ccitt(&p, sizeof(p) - 4);
 		p.check = crc;
@@ -265,9 +270,11 @@ int main(int argc, char** argv) {
 			}
 		}
 		seq++;
+		retransmitted = 0;
 		memset(&p, 0, sizeof(p));
 		memcpy(&p, y->payload, sizeof(p));
 		if (p.type == N){
+			printf("[%s]: Am primit NACK pentru Z cu seq %d\n", __FILE__, seq);
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, &t.payload, sizeof(p));
 			p.seq = seq;
@@ -281,7 +288,7 @@ int main(int argc, char** argv) {
 			retransmitted = 0;
 			goto WAIT_ACK_Z;
 		}
-		show_packet(p);
+		//show_packet(p);
 
 		if (i == argc-1){
 			//send EOF message
@@ -293,7 +300,7 @@ int main(int argc, char** argv) {
 			p.seq = seq;
 			p.type = B;
 			printf("[%s]: Sending type %d\n", __FILE__, p.type);
-			show_packet(p);
+			//show_packet(p);
 			//len - 4 means the length of the message minus MARK + CHECK + PADDING
 			crc= crc16_ccitt(&p, sizeof(p) - 4);
 			p.check = crc;
@@ -320,9 +327,11 @@ int main(int argc, char** argv) {
 				}
 			}
 			seq++;
+			retransmitted = 0;
 			memset(&p, 0, sizeof(p));
 			memcpy(&p, y->payload, sizeof(p));
 			if (p.type == N){
+				printf("[%s]: Am primit NACK pentru B cu seq %d\n", __FILE__, seq);
 				memset(&p, 0, sizeof(p));
 				memcpy(&p, &t.payload, sizeof(p));
 				p.seq = seq;
@@ -342,9 +351,11 @@ int main(int argc, char** argv) {
 
 
 	RELEASE:
+		printf("[%s]: Aici\n", __FILE__);
 		if (f != NULL){
 			fflush(f);
 			fclose(f);
 		}
+		printf("[%s]: Aici\n", __FILE__);
     return 0;
 }
