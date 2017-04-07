@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 	msg *y;
 	char buffer[MAXL];
 	int numBytes;
-	FILE *f;
+	FILE *f = NULL;
 	int type = 0;
 	//TODO Save current packet and current index
 
@@ -109,14 +109,16 @@ int main(int argc, char** argv) {
 		goto WAIT_ACK_S;
 	}
 	
-	//send B message
+	//send F message
 	memset(&p, 0, sizeof(p));
 	memset(&t, 0, sizeof(msg));
 	len = sizeof(p) - 2;
 	p.soh = soh;
 	p.len = len;
 	p.seq = seq;
-	p.type = B;
+	p.type = F;
+	sprintf(p.data, "%s", argv[1]);
+	f = fopen(argv[1], "r+");
 	printf("[%s]: Sending type %d\n", __FILE__, p.type);
 	show_packet(p);
 	//len - 4 means the length of the message minus MARK + CHECK + PADDING
@@ -162,6 +164,129 @@ int main(int argc, char** argv) {
 		goto WAIT_ACK_ANY;
 	}
 	show_packet(p);
+
+
+
+	//send D message
+	memset(&p, 0, sizeof(p));
+	memset(&t, 0, sizeof(msg));
+	len = sizeof(p) - 2;
+	p.soh = soh;
+	p.len = len;
+	p.seq = seq;
+	p.type = D;
+	numBytes = fread(p.data, MAXL, 1, f);
+	printf("[%s]: Sending type %d\n", __FILE__, p.type);
+	show_packet(p);
+	//len - 4 means the length of the message minus MARK + CHECK + PADDING
+	crc= crc16_ccitt(&p, sizeof(p) - 4);
+	p.check = crc;
+	//the size of the status fields is the len + the first two fields
+	memcpy(&t.payload, &p, sizeof(p));
+	//SOH + LEN + Len
+	t.len = sizeof(p);
+	//Send s
+	rc = send_message(&t);
+	DIE(rc < 0, "Cannot send message S");
+
+	WAIT_ACK_ANY_2:
+	//while has to receive packets
+	while ((y = receive_message_timeout(TIME * 1000)) == NULL){
+		if (retransmitted == 3){
+			//TODO Stop transmission
+			//stop connection
+			goto RELEASE;
+		}else{
+			rc = send_message(&t);
+			DIE(rc < 0, "Cannot resend send message S");
+			retransmitted++;
+			print_status(retransmitted);
+		}
+	}
+	seq++;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p, y->payload, sizeof(p));
+	if (p.type == N){
+		memset(&p, 0, sizeof(p));
+		memcpy(&p, &t.payload, sizeof(p));
+		p.seq = seq;
+		crc = crc16_ccitt(&p, sizeof(p) -4);
+		p.check = crc;
+		memset(&t, 0, sizeof(t));
+		memcpy(&t.payload, &p, sizeof(p));
+		t.len = sizeof(p);
+		rc = send_message(&t);
+		DIE(rc < 0, "Cannot send S packet again");
+		retransmitted = 0;
+		goto WAIT_ACK_ANY_2;
+	}
+	show_packet(p);
+
+
+
+	//send EOF message
+	memset(&p, 0, sizeof(p));
+	memset(&t, 0, sizeof(msg));
+	len = sizeof(p) - 2;
+	p.soh = soh;
+	p.len = len;
+	p.seq = seq;
+	p.type = D;
+	numBytes = fread(p.data, MAXL, 1, f);
+	if (numBytes == 0)
+		p.type = Z;
+	printf("[%s]: Sending type %d\n", __FILE__, p.type);
+	show_packet(p);
+	//len - 4 means the length of the message minus MARK + CHECK + PADDING
+	crc= crc16_ccitt(&p, sizeof(p) - 4);
+	p.check = crc;
+	//the size of the status fields is the len + the first two fields
+	memcpy(&t.payload, &p, sizeof(p));
+	//SOH + LEN + Len
+	t.len = sizeof(p);
+	//Send s
+	rc = send_message(&t);
+	DIE(rc < 0, "Cannot send message S");
+
+	WAIT_ACK_ANY_3:
+	//while has to receive packets
+	while ((y = receive_message_timeout(TIME * 1000)) == NULL){
+		if (retransmitted == 3){
+			//TODO Stop transmission
+			//stop connection
+			goto RELEASE;
+		}else{
+			rc = send_message(&t);
+			DIE(rc < 0, "Cannot resend send message S");
+			retransmitted++;
+			print_status(retransmitted);
+		}
+	}
+	seq++;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p, y->payload, sizeof(p));
+	if (p.type == N){
+		memset(&p, 0, sizeof(p));
+		memcpy(&p, &t.payload, sizeof(p));
+		p.seq = seq;
+		crc = crc16_ccitt(&p, sizeof(p) -4);
+		p.check = crc;
+		memset(&t, 0, sizeof(t));
+		memcpy(&t.payload, &p, sizeof(p));
+		t.len = sizeof(p);
+		rc = send_message(&t);
+		DIE(rc < 0, "Cannot send S packet again");
+		retransmitted = 0;
+		goto WAIT_ACK_ANY_3;
+	}
+	show_packet(p);
+
+
+
 	RELEASE:
+		if (f != NULL){
+			fflush(f);
+			fclose(f);
+		}
     return 0;
 }

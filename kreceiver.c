@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 	uint16_t crc;
 	packet p;
 	s_packet s;
-	FILE *f;
+	FILE *f = NULL;
 	msg *y;
 	int retransmitted = 0;
 	int crc_calculat = 0;
@@ -73,7 +73,6 @@ int main(int argc, char** argv) {
 			retransmitted++;
 			send_message(&t);
 			printf("[%s]: Tot trimit cu retransmit = %d\n", __FILE__, retransmitted);
-			continue;
 		}
 		if (retransmitted == 4){
 			//stop connection
@@ -119,12 +118,34 @@ int main(int argc, char** argv) {
 					break;
 				}
 				case F:{
+					printf("[%s]: Am primit un mesaj de tip F\n", __FILE__);
+					if (f == NULL){
+						char filename[MAXL];
+						memset(filename, 0, MAXL);
+						sprintf(filename, "recv_");
+						strcat(filename, p.data);
+						f = fopen(filename, "a+");
+					}
 					break;
 				}
 				case D:{
+					printf("[%s]: Am primit un mesaj de tip D\n", __FILE__);
+					if (f != NULL){
+						fwrite(p.data, MAXL, 1, f);
+					} else {
+						printf("[%s]: File is null\n");
+						goto RELEASE;
+					}
 					break;
 				}
 				case Z:{
+					printf("[%s]: Am primit un mesaj de tip Z\n", __FILE__);
+					if (f != NULL){
+						fflush(f);
+						fclose(f);
+						printf("[%s]: Am închis fisierul\n");
+						f = NULL;
+					}
 					break;
 				}
 				case B:{
@@ -156,5 +177,9 @@ int main(int argc, char** argv) {
 
 	//TODO Close file
 	RELEASE:
+		if (f != NULL){
+			fflush(f);
+			fclose(f);
+		}
 	return 0;
 }
