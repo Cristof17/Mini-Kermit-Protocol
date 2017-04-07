@@ -50,13 +50,16 @@ int is_crc_ok(packet p){
 int main(int argc, char** argv) {
     msg r, t;
 	int rc = 0;
-	int seq_asteptat = 0;
-	int seq_trimis = 0;
+	int seq = 0;
 	uint16_t crc;
 	packet p;
 	s_packet s;
 	FILE *file;
 	msg *y;
+	int retransmitted = 0;
+	int crc_calculat = 0;
+	int crc_primit = 0;
+	int flag = 0;
 
     init(HOST, PORT);
 
@@ -74,46 +77,116 @@ int main(int argc, char** argv) {
 	//TODO Receive parameters
 	memset(&r, 0, sizeof(msg));
 	//TODO Not ok. The parameters might get lost that is why there is seg fault 
-	rc = recv_message(&r);
-	DIE(rc < 0, "error when receiving S packet");
-
-	//extract parameters
-	memset(&p, 0, sizeof(p));
-	memset(&s, 0, sizeof(s));
-	memcpy(&p, r.payload, r.len);
-	memcpy(&s, p.data, p.len - 1 -1 -2 -1);
-	//TODO Debug purpose
-	show_packet(p);
-	//check params CRC
-	crc = crc16_ccitt(&p, sizeof(p) - 3); 
-	print_crc(p);
-	seq_trimis = p.seq;
-	if (crc != p.check){
-		//TODO resend status packet
-		//create nack and send it
-		memset(&t, 0, sizeof(t));
-		create_nack(&t, seq_trimis);
-	} else { 
-		//create ack and send it
-		memset(&t, 0, sizeof(t));
-		create_ack(&t, ++seq_trimis);
+	while ((y = receive_message_timeout(TIME * 1000)) == NULL
+		&& retransmitted < 4){
+		retransmitted++;
+		continue;
 	}
-	print_message(t);
-	send_message(&t);
-
-	//TODO Receive the first message
-	while(p.type != B){
-		y = receive_message_timeout(TIME * 1000);
-		if (y == NULL){
-			fprintf(stderr, "TIMEOUT for seq %d\n", seq_asteptat);
-			//send the last message
-			send_message(&t);
+	if (retransmitted == 4){
+		//stop connection
+		//goto release
+	} else {
+		memset(&p, 0, sizeof(p));
+		memcpy(&p, y->payload, sizeof(p));
+		printf("received crc = %d\n", p.check);
+		show_packet(p);
+		crc_calculat = crc16_ccitt(&p, sizeof(packet)- 4);
+		crc_primit = p.check;
+		printf("CRC calculat = %d, primit = %d\n", crc_calculat, crc_primit);
+		memset(&r, 0, sizeof(r));
+		memcpy(&r, y, sizeof(r));
+		memset(&t, 0, sizeof(msg));
+		p.soh = SOH;
+		p.len = 0;
+		p.mark = MARK;
+		seq = p.seq;
+		seq++;
+		p.seq = seq;
+		if (crc_calculat != crc_primit){
+			p.type = N;
+			printf("Am primit S cu erori\n");
 		} else {
-			//process message	
-			print_message((*y));
-			seq_asteptat++;
+			p.type = Y;
+			printf("Am primit S fără erori\n");
+		}
+		memcpy(&t.payload, &p, sizeof(p));
+		t.len = sizeof(p);
+		rc = send_message(&t);
+		DIE (rc < 0, "Cannot send ACK for parameter packet");
+		retransmitted = 0;
+	}
+
+	printf("AIci \n");
+
+	//process S packet
+
+	/*
+	while(1){
+		while ((y = receive_message_timeout(TIME * 1000)) == NULL
+			&& retransmitted < 4){
+			retransmitted++;
+			send_message(&t);
+			printf("[%s]: Tot trimit cu retransmit = %d\n", __FILE__, retransmitted);
+			continue;
+		}
+		if (retransmitted == 4){
+			//stop connection
+			//goto release
+		} else {
+			memset(&p, 0, sizeof(p));
+			memcpy(&p, y->payload, sizeof(p));
+			crc_calculat = crc16_ccitt(&p, sizeof(packet)-4);
+			printf("CRC pentru S în receiver este %d\n", crc_calculat); 
+			crc_primit = p.check;
+			memset(&r, 0, sizeof(r));
+			memcpy(&r, y, sizeof(r));
+			memset(&t, 0, sizeof(msg));
+			p.soh = SOH;
+			p.len = 0;
+			p.mark = MARK;
+			seq = p.seq;
+			seq++;
+			p.seq = seq;
+			if (crc_calculat != crc_primit){
+				p.type = N;
+			} else {
+				p.type = Y;
+			}
+			memcpy(&t.payload, &p, sizeof(p));
+			t.len = sizeof(p);
+			rc = send_message(&t);
+			DIE (rc < 0, "Cannot send ACK for parameter packet");
+			retransmitted = 0;
+			printf("Tot intru in else\n");
+			
+			if (crc_calculat != crc_primit){
+				continue;
+			}
+			//luare actiune pentru fiecare tip de mesaj
+			show_packet(p);	
+			switch(p.type){
+				case S:{
+					break;
+				}
+				case F:{
+					break;
+				}
+				case D:{
+					break;
+				}
+				case Z:{
+					break;
+				}
+				case B:{
+					flag = 10;
+					break;
+				}
+			}
+			if (flag == 10)
+				break;
 		}
 	}
+	*/
 
 	//TODO While (!received EOT)
 

@@ -16,10 +16,15 @@ int main(int argc, char** argv) {
 	msg *curr;
 	int i = 0; //file index
 	int rc = 0; //return code
-	int seq_asteptat = 0 ; //current_packet_index
-	int seq_trimis = 0;
+	int seq = 0;
 	uint16_t crc = 0;
 	int retransmitted =0;
+	msg *y;
+	char buffer[MAXL];
+	int numBytes;
+	for (i =0 ;i < argc; ++i){
+		printf("Arg %d is %s\n", i, argv[i]);
+	}
 	//TODO Save current packet and current index
 
     init(HOST, PORT);
@@ -28,7 +33,7 @@ int main(int argc, char** argv) {
     t.len = strlen(t.payload);
     send_message(&t);
 
-    msg *y = receive_message_timeout(5000);
+    y= receive_message_timeout(5000);
     if (y == NULL) {
         perror("receive error");
 		//Resend
@@ -66,117 +71,122 @@ int main(int argc, char** argv) {
 	memset(&p, 0, sizeof(packet));
 	uint8_t soh = SOH;
 	uint8_t len = 1 + 1 + 11 + 2 + 1;
-	//len - 1 means the length of the message minus MARK
 	p.soh = soh;
 	p.len = len;
-	p.seq = seq_trimis;
+	p.seq = seq;
 	p.type = S;
-	crc= crc16_ccitt(&p, p.len - 3);
+	p.mark = MARK;
+	memcpy(&p.data, &s, sizeof(s_packet));
+	//len - 3 means the length of the message minus MARK + CHECK
+	crc= crc16_ccitt(&p, sizeof(packet)-4);
 	p.check = crc;
+	show_packet(p);
 	//the size of the status fields is the len + the first two fields
-	memcpy(&p.data, &s, len +2);
 	memcpy(&t.payload, &p, sizeof(p));
 	//SOH + LEN + Len
 	t.len = sizeof(p);
-
-	//CRC for S
 	//Send s
 	rc = send_message(&t);
 	DIE(rc < 0, "Cannot send message S");
-	seq_trimis++;
-	
+
+	WAIT_ACK_S:
+	//while has to receive packets
+	while ((y = receive_message_timeout(TIME * 1000)) == NULL){
+		if (retransmitted == 3){
+			//TODO Stop transmission
+			//stop connection
+			//goto release;
+		}else{
+			rc = send_message(&t);
+			DIE(rc < 0, "Cannot resend send message S");
+			retransmitted++;
+			print_status(retransmitted);
+		}
+	}
+	seq++;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p, y->payload, sizeof(p));
+	if (p.type == N){
+		memset(&p, 0, sizeof(p));
+		memcpy(&p.data, &s, sizeof(s));
+		p.soh = soh;
+		p.type = S;
+		p.len = 1 + 1 + 11 + 2 + 1;
+		p.seq = seq;
+		p.mark = MARK;
+		crc = crc16_ccitt(&p, sizeof(packet) - 4);
+		printf("CRC pentru S în sender este %d\n", crc);
+		p.check = crc;
+		memset(&t, 0, sizeof(t));
+		memcpy(&t.payload, &p, sizeof(p));
+		t.len = sizeof(p);
+		rc = send_message(&t);
+		DIE(rc < 0, "Cannot send S packet again");
+		retransmitted = 0;
+		goto WAIT_ACK_S;
+	}
+	show_packet(p);
+	printf("Trec de primul while\n");
+
+
+	/*
+	memset(&p, 0, sizeof(packet));
+	memset(&t, 0, sizeof(msg));
+	len = sizeof(p) - 2;
+	p.soh = soh;
+	p.len = len;
+	p.seq = seq;
+	p.type = B;
+	//len - 3 means the length of the message minus MARK + CHECK
+	crc= crc16_ccitt(&p, sizeof(p) - 4);
+	p.check = crc;
+	//the size of the status fields is the len + the first two fields
+	memcpy(&t.payload, &p, sizeof(p));
+	//SOH + LEN + Len
+	t.len = sizeof(p);
+	//Send s
+	rc = send_message(&t);
+	DIE(rc < 0, "Cannot send message S");
 	show_packet(p);
 	print_crc(p);
 
-	//wait for ack for parameter packet
-	memset(y, 0, sizeof(msg));
-	//conver to milies
-    y = receive_message_timeout(TIME * 1000);
-    if (y == NULL) {
-        perror("receive error");
-		//here is a problem
-		//resend last packet;
-		rc = send_message(&t);
-		DIE(rc < 0, "Cannot resend send message S");
-		retransmitted++;
-		//while has to receive packets
-		while (((y = receive_message_timeout(TIME * 1000)) == NULL)
-				&& retransmitted < 3){
-				rc = send_message(&t);
-				DIE(rc < 0, "Cannot resend send message S");
-				retransmitted++;
-		}
-		if (retransmitted == 4){
+	WAIT_ACK_B:
+	//while has to receive packets
+	while ((y = receive_message_timeout(TIME * 1000)) == NULL){
+		if (retransmitted == 3){
 			//TODO Stop transmission
 			//stop connection
-		} else{
-			seq_asteptat++;
-		}
-    } else { 
-		memset(&p, 0, sizeof(packet));
-		memcpy(&p, y->payload, y->len);
-		if (p.type == N){
-			//resend last packet with seq increased
-			memset(&t, 0, sizeof(msg));
-			p.seq = seq_trimis;
+			//goto release;
+		}else{
 			rc = send_message(&t);
-			DIE(rc < 0, "Cannot send NACK");
-		}else {
-			//increase seq
-			seq_asteptat++;
+			DIE(rc < 0, "Cannot resend send message S");
+			retransmitted++;
+			print_status(retransmitted);
 		}
-        printf("[%s] Got  %s of type %d\n", argv[0], y->payload, p.type);
-    }
-
-	//TODO Send init
-	for (i = 1; i < argc-1; ++i){
-		char *filename = argv[i];
-		char *strip = NULL;
-		FILE *f = fopen(filename, "r+");
-		DIE(f == NULL, "Filename is null ");
-		int filename_len = strlen(filename);
-
-		//create F packet
-		memset(&p, 0, sizeof(packet));
-		memset(&t, 0, sizeof(msg));
-		p.soh = SOH;
-		p.len = 1 + 1 + filename_len + 2 + 1;
-		p.seq = seq_trimis;
-		p.type = F;
-		strcpy(p.data, filename);
-		crc = crc16_ccitt(&p, 4 + filename_len);
-		p.check = crc;
-		show_packet(p);
-		
-		//put it into a message
-		
-		//SOH + LEN + SEQ + TYPE +_DATA + CHECK + MARK
-		t.len = (4 + filename_len + 3) + 1;
-		//plus the \0 of the string
-		memcpy(t.payload, &p, sizeof(p));
-		rc = send_message(&t);
-		print_message(t);
-		DIE (rc < 0, "Cannot send message with filename");
-		y = receive_message_timeout(TIME * 1000);
-		if (y == NULL){
-			//resend the next packet
-			rc = send_message(&t);
-			DIE (rc < 0, "Cannot resend lost data packet");
-		} else {
-			memset(&p, 0, sizeof(p));
-			memcpy(&p, y->payload, sizeof(p));
-			show_packet(p);
-			if (p.type == Y){
-				seq_asteptat++;
-			} else {
-				rc = send_message(&t);
-				DIE(rc < 0, "Cannot resend corrupted file");
-			}
-		}
-		fclose(f);
 	}
-
-	//TODO split files
+	seq++;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p, y->payload, sizeof(p));
+	if (p.type == N){
+		memset(&p, 0, sizeof(p));
+		memcpy(&p.data, &s, sizeof(s));
+		p.soh = soh;
+		p.type = S;
+		p.len = len;
+		p.seq = seq;
+		p.mark = MARK;
+		crc = crc16_ccitt(&p, sizeof(p) -3);
+		p.check = crc;
+		memset(&t, 0, sizeof(t));
+		memcpy(&t.payload, &p, sizeof(p));
+		t.len = sizeof(p);
+		rc = send_message(&t);
+		DIE(rc < 0, "Cannot send S packet again");
+		retransmitted = 0;
+		goto WAIT_ACK_B;
+	}
+	show_packet(p);
+	*/
 
     return 0;
 }

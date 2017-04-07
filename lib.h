@@ -11,10 +11,10 @@
 #define N 70
 
 #define PAYLOAD_LEN 1400
-#define MAXL 250
+#define MAXL 		250
 
-#define OK 1
-#define NOT_OK 0
+#define OK 		1
+#define NOT_OK 	0
 
 #define show_packet(p) printf("[%s] %x %x %x %x %hu %s\n",__FILE__, p.soh, p.len, p.seq, p.type, p.check, p.data);
 
@@ -26,12 +26,15 @@
 
 #define print_stats(s) printf("[%s] %d %d %d %c %c\n", __FILE__, s.maxl, s.time,s.npad, s.padc, s.eol);
 
-#define SOH 0x01
-#define MAXL 250
-#define TIME 5 //seconds
-#define NPAD 0x00
-#define PADC 0x00
-#define EOL 0x0D
+#define print_status(i) printf("[%s] Aștept cu i = %d\n", __FILE__, i);
+
+#define SOH		0x01
+#define MAXL	250
+#define TIME 	5 //seconds
+#define NPAD 	0x00
+#define PADC	0x00
+#define EOL 	0x0D
+#define MARK 	0x0D
 
 typedef struct {
 	uint8_t soh;
